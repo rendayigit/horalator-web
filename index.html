@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="tr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Horalator — Mesai Hesaplama</title>
+  <meta name="description" content="Giriş ve çıkış saatlerinizi girin; molaları, günlük net mesainizi ve haftalık takviminizi anında hesaplayın. Verileriniz yalnızca tarayıcınızda saklanır.">
+  <meta name="theme-color" content="#eef2ff" id="metaThemeColor">
+  <meta name="color-scheme" content="light dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Horalator">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="./icons/favicon-48.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./css/styles.css">
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('horalator.theme') || 'system';
+        var dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (error) { /* localStorage may be unavailable */ }
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">İçeriğe geç</a>
+
+  <svg class="svg-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+    <symbol id="icon-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="icon-calculator" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></symbol>
+    <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="icon-calendar-plus" viewBox="0 0 24 24"><path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/><path d="M16 2v4M8 2v4M3 10h18M16 19h6M19 16v6"/></symbol>
+    <symbol id="icon-calendar-check" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="icon-log-in" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></symbol>
+    <symbol id="icon-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="icon-utensils" viewBox="0 0 24 24"><path d="M3 2v7a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6a2 2 0 0 0 2 2h3zM21 15v7"/></symbol>
+    <symbol id="icon-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+    <symbol id="icon-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></symbol>
+    <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="icon-check-circle" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></symbol>
+    <symbol id="icon-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></symbol>
+    <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+    <symbol id="icon-bell-off" viewBox="0 0 24 24"><path d="M13.73 21a2 2 0 0 1-3.46 0M18.63 13A17.9 17.9 0 0 1 18 8M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.33-5M2 2l20 20"/></symbol>
+    <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-6"/></symbol>
+    <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="icon-smartphone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="icon-external-link" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14L21 3"/></symbol>
+    <symbol id="icon-info-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+    <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="header-inner">
+        <a class="brand" href="#daily" data-tab="daily" aria-label="Horalator, günlük hesaplama">
+          <img class="brand-icon" src="./icons/icon-192.png" alt="" width="42" height="42">
+          <span class="brand-copy">
+            <span class="brand-name">Horalator</span>
+            <span class="brand-sub">Mesai Hesaplama</span>
+          </span>
+        </a>
+
+        <nav class="desktop-nav" aria-label="Ana menü">
+          <button class="nav-tab is-active" type="button" data-tab="daily" aria-current="page">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg>
+            <span>Günlük</span>
+          </button>
+          <button class="nav-tab" type="button" data-tab="calendar">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg>
+            <span>Takvim</span>
+          </button>
+          <button class="nav-tab" type="button" data-tab="settings">
+            <svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg>
+            <span>Ayarlar</span>
+          </button>
+        </nav>
+
+        <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Koyu temaya geç">
+          <svg class="icon icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
+          <svg class="icon icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="container" id="main">
+      <!-- GÜNLÜK -->
+      <section class="view" id="view-daily" aria-labelledby="dailyTitle">
+        <div class="page-head">
+          <div class="page-head-copy">
+            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg> Günlük hesaplama</p>
+            <h1 id="dailyTitle">Bugün kaç saat çalıştın?</h1>
+            <p class="lead">Giriş ve çıkış saatini gir; molaları ve net mesaiyi anında hesaplayalım.</p>
+          </div>
+          <div class="date-pill" id="todayPill">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg>
+            <span id="todayPillText">—</span>
+          </div>
+        </div>
+
+        <div class="daily-layout">
+          <article class="card form-card">
+            <div class="card-heading">
+              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
+              <div>
+                <h2>Mesai bilgileri</h2>
+                <p>Saatler 24 saat formatındadır.</p>
+              </div>
+            </div>
+
+            <form id="dailyForm" novalidate>
+              <div class="time-grid">
+                <label class="time-field" for="startTime">
+                  <span class="time-icon"><svg class="icon" aria-hidden="true"><use href="#icon-log-in"/></svg></span>
+                  <span class="time-field-body">
+                    <span class="time-label">Giriş saati</span>
+                    <input id="startTime" name="startTime" type="time" step="60" autocomplete="off" aria-describedby="calcNote">
+                  </span>
+                </label>
+                <label class="time-field" for="endTime">
+                  <span class="time-icon time-icon-end"><svg class="icon" aria-hidden="true"><use href="#icon-log-out"/></svg></span>
+                  <span class="time-field-body">
+                    <span class="time-label">Çıkış saati</span>
+                    <input id="endTime" name="endTime" type="time" step="60" autocomplete="off" aria-describedby="calcNote">
+                  </span>
+                </label>
+              </div>
+
+              <div class="preset-row" aria-label="Hızlı saat seçenekleri">
+                <span>Hızlı doldur</span>
+                <button class="chip" type="button" data-start="08:00" data-end="17:00">08:00 – 17:00</button>
+                <button class="chip" type="button" data-start="09:00" data-end="18:00">09:00 – 18:00</button>
+              </div>
+
+              <div class="toggle-row" id="dinnerRow">
+                <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#icon-utensils"/></svg></span>
+                <div class="toggle-copy">
+                  <span class="toggle-title">Akşam yemeği molası</span>
+                  <span class="toggle-sub" id="dinnerHint">18:00 ve sonrası çıkışlarda kullanılabilir</span>
+                </div>
+                <label class="switch" for="dinnerToggle">
+                  <input id="dinnerToggle" type="checkbox" aria-label="Akşam yemeği molasını ekle">
+                  <span class="switch-track" aria-hidden="true"></span>
+                </label>
+              </div>
+
+              <button class="btn btn-primary btn-block" id="addToCalendarBtn" type="submit" disabled>
+                <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
+                <span>Takvime ekle</span>
+                <svg class="icon icon-trailing" aria-hidden="true"><use href="#icon-arrow-right"/></svg>
+              </button>
+              <p class="form-note" id="calcNote" role="status">Hesaplama için iki saati de girin.</p>
+            </form>
+          </article>
+
+          <aside class="card result-card" aria-labelledby="resultTitle">
+            <div class="result-head">
+              <div>
+                <h2 id="resultTitle">Hesaplama özeti</h2>
+                <p>Net çalışma süreniz</p>
+              </div>
+              <span class="status-chip" id="resultStatus" data-state="empty">Saat girin</span>
+            </div>
+
+            <div class="ring-wrap">
+              <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+                <defs>
+                  <linearGradient id="ringGradient" x1="20" y1="180" x2="180" y2="20" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#00aaff"/>
+                    <stop offset=".55" stop-color="#4d8dff"/>
+                    <stop offset="1" stop-color="#8a2be2"/>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="100" cy="100" r="84" pathLength="100"/>
+                <circle class="ring-value" id="ringValue" cx="100" cy="100" r="84" pathLength="100"/>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-time" id="netTime">00:00</span>
+                <span class="ring-label">net mesai</span>
+              </div>
+            </div>
+
+            <div class="result-metrics">
+              <div class="metric">
+                <span class="metric-label">Brüt süre</span>
+                <strong id="grossTime">00:00</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Toplam mola</span>
+                <strong id="breakTime">00:00</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-label">8 saat hedefi</span>
+                <strong id="targetDelta">—</strong>
+              </div>
+            </div>
+
+            <div class="break-detail" id="breakDetail">Molalar çalışma süresine göre otomatik hesaplanır.</div>
+            <div class="result-note" id="resultNote">
+              <svg class="icon" aria-hidden="true"><use href="#icon-info-circle"/></svg>
+              <span>Sonuç, giriş ve çıkış saatleri girildiğinde güncellenir.</span>
+            </div>
+          </aside>
+        </div>
+
+        <article class="card week-snapshot" aria-labelledby="weekSnapshotTitle">
+          <div class="section-head">
+            <div>
+              <h2 id="weekSnapshotTitle">Bu hafta</h2>
+              <p id="weekRange">—</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" data-tab="calendar">
+              Takvimi aç
+              <svg class="icon" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+            </button>
+          </div>
+          <div class="week-overview">
+            <div class="week-total">
+              <strong id="weekTotal">00:00</strong>
+              <span id="weekTarget">/ 40:00</span>
+            </div>
+            <div class="week-progress-wrap">
+              <div class="progress" role="progressbar" aria-label="Haftalık 40 saat hedefi" aria-valuemin="0" aria-valuemax="40" aria-valuenow="0" id="weekProgressBar">
+                <span id="weekProgress"></span>
+              </div>
+              <div class="progress-labels">
+                <span id="weekDayCount">0 / 5 gün</span>
+                <span id="weekDelta">Hedefe 40:00 kaldı</span>
+              </div>
+            </div>
+          </div>
+          <div class="mini-week" id="weekMiniDays"></div>
+        </article>
+
+        <details class="card rules-card">
+          <summary>
+            <span class="summary-icon"><svg class="icon" aria-hidden="true"><use href="#icon-info-circle"/></svg></span>
+            <span>Hesaplama nasıl yapılıyor?</span>
+            <svg class="icon summary-chevron" aria-hidden="true"><use href="#icon-chevron-down"/></svg>
+          </summary>
+          <ul>
+            <li>Giriş saati 07:xx ise 08:00; çıkış saati 17:xx ise 17:00 olarak hesaplanır.</li>
+            <li>Molalar: 4 saatten az 15 dk, 4–7:30 arası 30 dk, 7:30–11 arası 1 saat, 11 saat ve üzeri 1,5 saat.</li>
+            <li>Akşam yemeği molası 30 dk ekler; toplam mola 1,5 saatten fazla olamaz.</li>
+            <li>Çıkış saati girişten küçükse gece vardiyası kabul edilir ve ertesi güne devam ettiği hesaplanır.</li>
+          </ul>
+        </details>
+      </section>
+
+      <!-- TAKVİM -->
+      <section class="view" id="view-calendar" aria-labelledby="calendarTitle" hidden>
+        <div class="page-head">
+          <div class="page-head-copy">
+            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg> Mesai takibi</p>
+            <h1 id="calendarTitle">Takvim</h1>
+            <p class="lead">Haftalık hedefinizi ve günlük kayıtlarınızı tek bakışta görün.</p>
+          </div>
+          <div class="page-actions">
+            <label class="select-wrap" id="calendarFilterWrap" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg>
+              <select id="calendarFilter" aria-label="Ay filtresi">
+                <option value="all">Tüm zamanlar</option>
+              </select>
+            </label>
+            <button class="btn btn-secondary btn-sm" type="button" id="calendarTodayBtn">
+              <svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg>
+              Bugüne git
+            </button>
+            <button class="btn btn-primary btn-sm" type="button" data-tab="daily">
+              <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
+              Mesai ekle
+            </button>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <div class="stat-card">
+            <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar-check"/></svg></span>
+            <div>
+              <span class="stat-label">Toplam kayıt</span>
+              <strong id="statDays">0 gün</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon stat-icon-purple"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg></span>
+            <div>
+              <span class="stat-label">Toplam mesai</span>
+              <strong id="statTotal">00:00</strong>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon stat-icon-green"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
+            <div>
+              <span class="stat-label">Bu hafta</span>
+              <strong id="statWeek">00:00 <small>/ 40:00</small></strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="calendar-content" id="calendarContent"></div>
+
+        <div class="empty-state card" id="calendarEmpty" hidden>
+          <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg></span>
+          <h2>Takvim henüz boş</h2>
+          <p>Günlük mesainizi hesaplayıp takvime eklediğinizde haftalık özetiniz burada görünecek.</p>
+          <button class="btn btn-primary" type="button" data-tab="daily">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
+            İlk mesaiyi ekle
+          </button>
+        </div>
+      </section>
+
+      <!-- AYARLAR -->
+      <section class="view" id="view-settings" aria-labelledby="settingsTitle" hidden>
+        <div class="page-head">
+          <div class="page-head-copy">
+            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg> Tercihler</p>
+            <h1 id="settingsTitle">Ayarlar</h1>
+            <p class="lead">Görünümü, yedeklerinizi ve hatırlatıcılarınızı yönetin.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <section class="card settings-card" aria-labelledby="appearanceTitle">
+            <div class="card-heading compact">
+              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sun"/></svg></span>
+              <div>
+                <h2 id="appearanceTitle">Görünüm</h2>
+                <p>Size en uygun temayı seçin.</p>
+              </div>
+            </div>
+            <div class="theme-options" role="radiogroup" aria-label="Tema">
+              <label class="theme-option">
+                <input type="radio" name="theme" value="system">
+                <span class="theme-option-inner">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-monitor"/></svg>
+                  <span>Sistem</span>
+                </span>
+              </label>
+              <label class="theme-option">
+                <input type="radio" name="theme" value="light">
+                <span class="theme-option-inner">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-sun"/></svg>
+                  <span>Açık</span>
+                </span>
+              </label>
+              <label class="theme-option">
+                <input type="radio" name="theme" value="dark">
+                <span class="theme-option-inner">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-moon"/></svg>
+                  <span>Koyu</span>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="dataTitle">
+            <div class="card-heading compact">
+              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-database"/></svg></span>
+              <div>
+                <h2 id="dataTitle">Veriler</h2>
+                <p>Kayıtlar bu cihazın tarayıcısında saklanır.</p>
+              </div>
+            </div>
+            <div class="setting-list">
+              <div class="setting-row">
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-download"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Verileri dışa aktar</span>
+                  <span class="setting-sub">JSON yedeği indir, başka cihaza taşı</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" id="exportBtn">İndir</button>
+              </div>
+              <div class="setting-row">
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-upload"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Verileri içe aktar</span>
+                  <span class="setting-sub">Daha önce aldığınız yedeği geri yükle</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" id="importBtn">Seç</button>
+                <input class="sr-only" type="file" id="importFile" accept="application/json,.json">
+              </div>
+            </div>
+            <div class="data-meta" id="dataMeta">0 gün kayıtlı</div>
+            <div class="privacy-note">
+              <svg class="icon" aria-hidden="true"><use href="#icon-shield"/></svg>
+              <span>Hiçbir veri sunucuya gönderilmez. Yedek almak için dışa aktarmayı kullanabilirsiniz.</span>
+            </div>
+            <button class="btn btn-danger-ghost btn-block" type="button" id="clearDataBtn">
+              <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
+              Tüm kayıtları sil
+            </button>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="remindersTitle">
+            <div class="card-heading compact">
+              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-bell"/></svg></span>
+              <div>
+                <h2 id="remindersTitle">Hatırlatıcılar</h2>
+                <p>Hafta içi mesai girmeyi unutmayın.</p>
+              </div>
+            </div>
+            <div class="setting-list">
+              <div class="setting-row">
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-bell"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Günlük hatırlatıcı</span>
+                  <span class="setting-sub">Pazartesi–Cuma, seçtiğiniz saatte</span>
+                </div>
+                <label class="switch" for="remindersToggle">
+                  <input id="remindersToggle" type="checkbox" aria-label="Günlük hatırlatıcıyı etkinleştir">
+                  <span class="switch-track" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div id="reminderOptions" hidden>
+                <div class="setting-row">
+                  <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg></span>
+                  <div class="setting-copy">
+                    <span class="setting-title">Hatırlatma saati</span>
+                    <span class="setting-sub">Kayıt girilmemişse bildirim gönderilir</span>
+                  </div>
+                  <input class="time-input-small" type="time" id="reminderTime" step="60" aria-label="Hatırlatma saati">
+                </div>
+                <div class="permission-row">
+                  <div>
+                    <span class="permission-label">Bildirim izni</span>
+                    <span class="permission-status" id="permissionStatus">Durum kontrol ediliyor…</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" type="button" id="permissionBtn">İzin ver</button>
+                </div>
+                <button class="btn btn-secondary btn-block" type="button" id="testNotificationBtn">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-bell"/></svg>
+                  Bildirimi dene
+                </button>
+              </div>
+            </div>
+            <p class="note">
+              <svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg>
+              <span>Tarayıcı bildirimleri yalnızca Horalator açıkken çalışır. Telefonda uygulamayı ana ekranınıza ekleyebilirsiniz.</span>
+            </p>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="aboutTitle">
+            <div class="card-heading compact">
+              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-info-circle"/></svg></span>
+              <div>
+                <h2 id="aboutTitle">Hakkında</h2>
+                <p>Horalator Web</p>
+              </div>
+            </div>
+            <p class="about-text">Android sürümüyle aynı hesaplama kurallarını kullanan, tamamen tarayıcıda çalışan mesai hesaplayıcı.</p>
+            <div class="setting-list">
+              <div class="setting-row" id="installRow" hidden>
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-smartphone"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Ana ekrana ekle</span>
+                  <span class="setting-sub">Uygulama gibi aç, çevrimdışı kullan</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" id="installBtn">Yükle</button>
+              </div>
+              <a class="setting-row setting-link" href="https://play.google.com/store/apps/details?id=com.renda.horalator" target="_blank" rel="noopener noreferrer">
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-smartphone"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Android sürümü</span>
+                  <span class="setting-sub">Google Play Store'da görüntüle</span>
+                </div>
+                <svg class="icon link-icon" aria-hidden="true"><use href="#icon-external-link"/></svg>
+              </a>
+              <a class="setting-row setting-link" href="https://doc-hosting.flycricket.io/horalator-privacy-policy/d2f9b5fe-f765-4b13-92c7-437603bcca2b/privacy" target="_blank" rel="noopener noreferrer">
+                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"/></svg></span>
+                <div class="setting-copy">
+                  <span class="setting-title">Gizlilik politikası</span>
+                  <span class="setting-sub">Verilerinizin nasıl işlendiğini öğrenin</span>
+                </div>
+                <svg class="icon link-icon" aria-hidden="true"><use href="#icon-external-link"/></svg>
+              </a>
+            </div>
+            <div class="version-row">
+              <span>Web sürümü 1.0.0</span>
+              <button class="btn btn-ghost btn-sm" type="button" id="refreshAppBtn">
+                <svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>
+                Yenile
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Ana menü">
+      <button class="bottom-tab is-active" type="button" data-tab="daily" aria-current="page">
+        <span class="bottom-tab-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
+        <span>Günlük</span>
+      </button>
+      <button class="bottom-tab" type="button" data-tab="calendar">
+        <span class="bottom-tab-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg></span>
+        <span>Takvim</span>
+      </button>
+      <button class="bottom-tab" type="button" data-tab="settings">
+        <span class="bottom-tab-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
+        <span>Ayarlar</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- TAKVİME EKLE -->
+  <dialog class="modal" id="addDialog" aria-labelledby="addTitle">
+    <form class="modal-card" id="addForm" novalidate>
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Takvim</p>
+          <h2 id="addTitle">Takvime ekle</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="addDialog" aria-label="Kapat">
+          <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+        </button>
+      </div>
+
+      <div class="add-preview">
+        <span class="preview-icon"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg></span>
+        <div>
+          <span>Kaydedilecek net süre</span>
+          <strong id="addDuration">00:00</strong>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label class="field-label" for="addDate">Hangi güne eklensin?</label>
+        <input type="date" id="addDate" name="addDate" required>
+        <p class="field-helper" id="addDateLabel">—</p>
+      </div>
+
+      <div class="quick-row" id="addDateQuick">
+        <button class="chip" type="button" data-day-offset="-1">Dün</button>
+        <button class="chip" type="button" data-day-offset="0">Bugün</button>
+        <button class="chip" type="button" data-day-offset="1">Yarın</button>
+      </div>
+
+      <p class="field-error" id="addError" role="alert"></p>
+      <div class="existing-note" id="addExisting"></div>
+
+      <div class="modal-actions">
+        <span></span>
+        <div class="action-group">
+          <button class="btn btn-ghost" type="button" data-close-dialog="addDialog">Vazgeç</button>
+          <button class="btn btn-primary" type="submit" id="addSubmit">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
+            Takvime ekle
+          </button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- GÜNÜ DÜZENLE -->
+  <dialog class="modal" id="editDialog" aria-labelledby="editTitle">
+    <form class="modal-card" id="editForm" novalidate>
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Kayıt</p>
+          <h2 id="editTitle">Günü düzenle</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="editDialog" aria-label="Kapat">
+          <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+        </button>
+      </div>
+
+      <p class="modal-sub" id="editDate">—</p>
+
+      <div class="form-field">
+        <label class="field-label" for="editDuration">Çalışılan süre</label>
+        <input class="duration-input" type="text" id="editDuration" name="editDuration" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="08:30" aria-describedby="editError">
+        <p class="field-helper">Saat:dakika biçiminde girin. 00:00 kaydı siler.</p>
+      </div>
+
+      <div class="quick-row" id="editQuick">
+        <button class="chip" type="button" data-duration="08:00">08:00</button>
+        <button class="chip" type="button" data-duration="08:30">08:30</button>
+        <button class="chip" type="button" data-duration="09:00">09:00</button>
+      </div>
+
+      <p class="field-error" id="editError" role="alert"></p>
+
+      <div class="modal-actions">
+        <button class="btn btn-danger-ghost" type="button" id="editDelete">
+          <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
+          Sil
+        </button>
+        <div class="action-group">
+          <button class="btn btn-ghost" type="button" data-close-dialog="editDialog">Vazgeç</button>
+          <button class="btn btn-primary" type="submit">
+            <svg class="icon" aria-hidden="true"><use href="#icon-check"/></svg>
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ONAY -->
+  <dialog class="modal modal-small" id="confirmDialog" aria-labelledby="confirmTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Onay</p>
+          <h2 id="confirmTitle">Emin misiniz?</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="confirmDialog" aria-label="Kapat">
+          <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+        </button>
+      </div>
+      <p class="modal-sub" id="confirmMessage"></p>
+      <div class="modal-actions">
+        <span></span>
+        <div class="action-group">
+          <button class="btn btn-ghost" type="button" id="confirmCancel">Vazgeç</button>
+          <button class="btn btn-danger" type="button" id="confirmOk">Onayla</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <noscript>
+    <div class="noscript">Horalator'ı kullanabilmek için tarayıcınızda JavaScript'i etkinleştirin.</div>
+  </noscript>
+
+  <script src="./js/app.js" defer></script>
+</body>
+</html>

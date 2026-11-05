@@ -1,0 +1,27 @@
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# Local tooling and output
+node_modules/
+dist/
+.cache/
+*.log
+
+# Environment / secrets
+.env
+.env.*

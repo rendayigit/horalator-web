@@ -1,0 +1,48 @@
+{
+  "name": "Horalator — Mesai Hesaplama",
+  "short_name": "Horalator",
+  "description": "Giriş ve çıkış saatlerinden net mesaiyi hesaplayın, haftalık takviminizi tutun.",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#050a1c",
+  "theme_color": "#06102e",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Günlük hesaplama",
+      "short_name": "Günlük",
+      "url": "./#daily",
+      "description": "Giriş ve çıkış saatlerinden mesai hesapla"
+    },
+    {
+      "name": "Takvim",
+      "short_name": "Takvim",
+      "url": "./#calendar",
+      "description": "Haftalık mesai kayıtlarını görüntüle"
+    }
+  ]
+}
