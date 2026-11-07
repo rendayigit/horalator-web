@@ -9,7 +9,9 @@
     reminderTime: 'horalator.reminders.time',
     reminderLast: 'horalator.reminders.last',
     lastStart: 'horalator.lastStart',
-    lastEnd: 'horalator.lastEnd'
+    lastEnd: 'horalator.lastEnd',
+    frequentPresets: 'horalator.frequentPresets.v1',
+    frequentDurations: 'horalator.frequentDurations.v1'
   };
 
   const WEEKDAYS_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
@@ -17,6 +19,14 @@
   const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
   const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
   const TARGET_MINUTES = 8 * 60;
+  const DEFAULT_PRESETS = [
+    { start: '08:00', end: '17:00' },
+    { start: '09:00', end: '18:00' }
+  ];
+  const DEFAULT_DURATIONS = [4 * 60, 8 * 60, 8 * 60 + 30, 9 * 60];
+  const MIN_FREQUENT_USES = 2;
+  const MAX_VISIBLE_FREQUENT_PRESETS = 3;
+  const MAX_STORED_FREQUENT_PRESETS = 8;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -29,8 +39,9 @@
     activeTab: 'daily',
     currentNetMinutes: 0,
     editingDate: null,
+    frequentPresets: [],
+    frequentDurations: [],
     calendarFilter: 'all',
-    installPrompt: null,
     lastRenderDate: '',
     reminderTimer: null,
     confirmResolver: null
@@ -157,16 +168,53 @@
     return `${MONTHS[Number(match[2]) - 1]} ${match[1]}`;
   }
 
+  function parseTimeOfDay(value) {
+    if (typeof value !== 'string') return null;
+    let text = value.trim();
+    if (!text) return null;
+    text = text.replace(/\s+/g, '').replace(/[.,;]/g, ':');
+
+    if (text.includes(':')) {
+      const parts = text.split(':');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{0,2}$/.test(parts[1])) return null;
+      const hours = Number(parts[0]);
+      const minutes = parts[1] === '' ? 0 : Number(parts[1]);
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+      return { hours, minutes, totalMinutes: hours * 60 + minutes };
+    }
+
+    if (/^\d{1,2}$/.test(text)) {
+      const hours = Number(text);
+      if (hours < 0 || hours > 23) return null;
+      return { hours, minutes: 0, totalMinutes: hours * 60 };
+    }
+
+    if (/^\d{3,4}$/.test(text)) {
+      const padded = text.padStart(4, '0');
+      const hours = Number(padded.slice(0, 2));
+      const minutes = Number(padded.slice(2));
+      if (hours > 23 || minutes > 59) return null;
+      return { hours, minutes, totalMinutes: hours * 60 + minutes };
+    }
+
+    return null;
+  }
+
+  function formatTimeOfDay(value) {
+    const parsed = parseTimeOfDay(value);
+    return parsed ? `${pad2(parsed.hours)}:${pad2(parsed.minutes)}` : null;
+  }
+
   function parseDuration(value) {
     if (typeof value !== 'string') return null;
-    let text = value.trim().replace(',', ':');
+    let text = value.trim().replace(/\s+/g, '').replace(/[.,;]/g, ':');
     if (!text) return null;
 
     if (text.includes(':')) {
       const parts = text.split(':');
-      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1])) return null;
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{0,2}$/.test(parts[1])) return null;
       const hours = Number(parts[0]);
-      const minutes = Number(parts[1]);
+      const minutes = parts[1] === '' ? 0 : Number(parts[1]);
       if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
       return hours * 60 + minutes;
     }
@@ -183,19 +231,15 @@
   }
 
   function parseClock(value) {
-    if (typeof value !== 'string') return null;
-    const match = value.match(/^(\d{1,2}):(\d{2})/);
-    if (!match) return null;
-    const hour = Number(match[1]);
-    const minute = Number(match[2]);
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    const parsed = parseTimeOfDay(value);
+    if (!parsed) return null;
 
     // Mirrors the Android app's workplace rounding rules.
-    const roundedStart = hour === 7;
-    const roundedEnd = hour === 17;
-    const adjusted = roundedStart ? 8 * 60 : roundedEnd ? 17 * 60 : hour * 60 + minute;
+    const roundedStart = parsed.hours === 7;
+    const roundedEnd = parsed.hours === 17;
+    const adjusted = roundedStart ? 8 * 60 : roundedEnd ? 17 * 60 : parsed.totalMinutes;
     return {
-      minutes: hour * 60 + minute,
+      minutes: parsed.totalMinutes,
       adjusted,
       roundedStart,
       roundedEnd
@@ -290,6 +334,203 @@
     return { enabled, time: validTime ? storedTime : '18:00' };
   }
 
+  function presetKey(start, end) {
+    return `${start}|${end}`;
+  }
+
+  function sanitizeFrequentPresets(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const start = formatTimeOfDay(item.start);
+        const end = formatTimeOfDay(item.end);
+        const count = Math.round(Number(item.count));
+        const lastUsed = Number(item.lastUsed);
+        if (!start || !end || !Number.isFinite(count) || count <= 0) return null;
+        const key = presetKey(start, end);
+        if (seen.has(key)) return null;
+        seen.add(key);
+        return { start, end, count, lastUsed: Number.isFinite(lastUsed) ? lastUsed : 0 };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed)
+      .slice(0, MAX_STORED_FREQUENT_PRESETS);
+  }
+
+  function loadFrequentPresets() {
+    const stored = readStorage(STORAGE.frequentPresets);
+    if (!stored) return [];
+    try {
+      return sanitizeFrequentPresets(JSON.parse(stored));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveFrequentPresets() {
+    writeStorage(STORAGE.frequentPresets, JSON.stringify(state.frequentPresets));
+  }
+
+  function recordPresetUsage(startValue, endValue) {
+    const start = formatTimeOfDay(startValue);
+    const end = formatTimeOfDay(endValue);
+    if (!start || !end) return;
+
+    const key = presetKey(start, end);
+    if (DEFAULT_PRESETS.some((preset) => presetKey(preset.start, preset.end) === key)) return;
+
+    const existing = state.frequentPresets.find((preset) => presetKey(preset.start, preset.end) === key);
+    if (existing) {
+      existing.count += 1;
+      existing.lastUsed = Date.now();
+    } else {
+      state.frequentPresets.push({ start, end, count: 1, lastUsed: Date.now() });
+    }
+
+    state.frequentPresets = state.frequentPresets
+      .sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed)
+      .slice(0, MAX_STORED_FREQUENT_PRESETS);
+    saveFrequentPresets();
+    renderQuickPresets();
+  }
+
+  function clearFrequentPresets() {
+    if (!state.frequentPresets.length) return;
+    state.frequentPresets = [];
+    removeStorage(STORAGE.frequentPresets);
+    renderQuickPresets();
+    showToast('Sık kullanılan saatler temizlendi.', { type: 'info' });
+  }
+
+  function presetRangeNetMinutes(startValue, endValue) {
+    const start = parseClock(startValue);
+    const end = parseClock(endValue);
+    if (!start || !end) return null;
+    const net = calculateWork(start, end, false).net;
+    return net > 0 ? net : null;
+  }
+
+  function renderQuickPresets() {
+    if (!dom.quickPresetChips) return;
+    const defaultKeys = new Set(DEFAULT_PRESETS.map((preset) => presetKey(preset.start, preset.end)));
+    const frequent = state.frequentPresets
+      .filter((preset) => preset.count >= MIN_FREQUENT_USES && !defaultKeys.has(presetKey(preset.start, preset.end)))
+      .slice(0, MAX_VISIBLE_FREQUENT_PRESETS);
+
+    const buildChip = (preset, count) => {
+      const net = presetRangeNetMinutes(preset.start, preset.end);
+      const netText = net ? `${formatMinutes(net)} net` : '';
+      const isFrequent = Number.isFinite(count);
+      const title = isFrequent
+        ? `Sık kullanılan · ${count} kez${netText ? ` · ${netText}` : ''}`
+        : netText;
+      const ariaLabel = isFrequent
+        ? `${preset.start} – ${preset.end}, sık kullanılan, ${count} kez${netText ? `, ${netText}` : ''}`
+        : `${preset.start} – ${preset.end}${netText ? `, ${netText}` : ''}`;
+      const star = isFrequent
+        ? '<svg class="icon" aria-hidden="true"><use href="#icon-star"/></svg>'
+        : '';
+      return `<button class="chip preset-chip${isFrequent ? ' is-frequent' : ''}" type="button" data-start="${preset.start}" data-end="${preset.end}" title="${title}" aria-label="${ariaLabel}">${star}${preset.start} – ${preset.end}</button>`;
+    };
+
+    const chips = frequent.map((preset) => buildChip(preset, preset.count));
+    DEFAULT_PRESETS.forEach((preset) => chips.push(buildChip(preset)));
+
+    dom.quickPresetChips.innerHTML = chips.join('');
+    if (dom.clearPresetsBtn) dom.clearPresetsBtn.hidden = frequent.length === 0;
+  }
+
+  function sanitizeFrequentDurations(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    return raw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const minutes = Math.round(Number(item.minutes));
+        const count = Math.round(Number(item.count));
+        const lastUsed = Number(item.lastUsed);
+        if (!Number.isFinite(minutes) || minutes <= 0 || minutes >= 24 * 60) return null;
+        if (!Number.isFinite(count) || count <= 0) return null;
+        if (seen.has(minutes)) return null;
+        seen.add(minutes);
+        return { minutes, count, lastUsed: Number.isFinite(lastUsed) ? lastUsed : 0 };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed)
+      .slice(0, MAX_STORED_FREQUENT_PRESETS);
+  }
+
+  function loadFrequentDurations() {
+    const stored = readStorage(STORAGE.frequentDurations);
+    if (!stored) return [];
+    try {
+      return sanitizeFrequentDurations(JSON.parse(stored));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveFrequentDurations() {
+    writeStorage(STORAGE.frequentDurations, JSON.stringify(state.frequentDurations));
+  }
+
+  function recordDurationUsage(minutes) {
+    const value = Math.round(Number(minutes));
+    if (!Number.isFinite(value) || value <= 0) return;
+    if (DEFAULT_DURATIONS.includes(value)) return;
+
+    const existing = state.frequentDurations.find((item) => item.minutes === value);
+    if (existing) {
+      existing.count += 1;
+      existing.lastUsed = Date.now();
+    } else {
+      state.frequentDurations.push({ minutes: value, count: 1, lastUsed: Date.now() });
+    }
+
+    state.frequentDurations = state.frequentDurations
+      .sort((a, b) => b.count - a.count || b.lastUsed - a.lastUsed)
+      .slice(0, MAX_STORED_FREQUENT_PRESETS);
+    saveFrequentDurations();
+    renderDurationPresets();
+  }
+
+  function clearFrequentDurations() {
+    if (!state.frequentDurations.length) return;
+    state.frequentDurations = [];
+    removeStorage(STORAGE.frequentDurations);
+    renderDurationPresets();
+    showToast('Sık kullanılan süreler temizlendi.', { type: 'info' });
+  }
+
+  function renderDurationPresets() {
+    const frequent = state.frequentDurations
+      .filter((item) => item.count >= MIN_FREQUENT_USES && !DEFAULT_DURATIONS.includes(item.minutes))
+      .slice(0, MAX_VISIBLE_FREQUENT_PRESETS);
+
+    const buildChip = (minutes, count) => {
+      const label = formatMinutes(minutes);
+      const isFrequent = Number.isFinite(count);
+      const title = isFrequent ? `Sık kullanılan · ${count} kez` : label;
+      const star = isFrequent
+        ? '<svg class="icon" aria-hidden="true"><use href="#icon-star"/></svg>'
+        : '';
+      return `<button class="chip preset-chip${isFrequent ? ' is-frequent' : ''}" type="button" data-duration="${label}" title="${title}" aria-label="${label}${isFrequent ? `, sık kullanılan, ${count} kez` : ''}">${star}${label}</button>`;
+    };
+
+    const chips = frequent.map((item) => buildChip(item.minutes, item.count));
+    DEFAULT_DURATIONS.forEach((minutes) => chips.push(buildChip(minutes)));
+    const html = chips.join('');
+
+    [dom.manualDurationChips, dom.editDurationChips].forEach((container) => {
+      if (container) container.innerHTML = html;
+    });
+    [dom.clearDurationsBtn, dom.clearDurationsEditBtn].forEach((button) => {
+      if (button) button.hidden = frequent.length === 0;
+    });
+  }
+
   function countWorkDays(data) {
     return Object.keys(data).length;
   }
@@ -380,10 +621,29 @@
     if (dom.todayPillText) dom.todayPillText.textContent = formatDateLong(todayDate());
   }
 
+  function updateTimeClearButtons() {
+    if (dom.startTimeClear) dom.startTimeClear.hidden = !dom.startTime.value.trim();
+    if (dom.endTimeClear) dom.endTimeClear.hidden = !dom.endTime.value.trim();
+  }
+
   function updateDaily() {
-    const start = parseClock(dom.startTime.value);
-    const end = parseClock(dom.endTime.value);
+    const startText = dom.startTime.value.trim();
+    const endText = dom.endTime.value.trim();
+    updateTimeClearButtons();
+    const start = parseClock(startText);
+    const end = parseClock(endText);
+    const startInvalid = startText !== '' && !start;
+    const endInvalid = endText !== '' && !end;
     const hasBoth = Boolean(start && end);
+
+    [
+      [dom.startTime, startInvalid],
+      [dom.endTime, endInvalid]
+    ].forEach(([input, invalid]) => {
+      input.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+      const field = input.closest('.time-field');
+      if (field) field.classList.toggle('is-invalid', invalid);
+    });
 
     const dinnerEligible = Boolean(end && end.adjusted >= 18 * 60);
     if (!dinnerEligible) dom.dinnerToggle.checked = false;
@@ -418,12 +678,16 @@
     if (!calculation || netMinutes <= 0) {
       dom.targetDelta.textContent = '—';
       dom.targetDelta.classList.remove('is-good', 'is-warn');
-      dom.statusChip.textContent = hasBoth ? 'Süre yok' : 'Saat girin';
+      dom.statusChip.textContent = startInvalid || endInvalid ? 'Geçersiz saat' : hasBoth ? 'Süre yok' : 'Saat girin';
       dom.statusChip.dataset.state = 'empty';
       dom.resultNote.classList.remove('is-good');
-      dom.resultNote.querySelector('span').textContent = hasBoth
-        ? 'Giriş ve çıkış saatleri geçerli bir süre oluşturmuyor.'
-        : 'Sonuç, giriş ve çıkış saatleri girildiğinde güncellenir.';
+      if (startInvalid || endInvalid) {
+        dom.resultNote.querySelector('span').textContent = 'Saatleri 24 saat biçiminde girin: SS:DD (örn. 17:30).';
+      } else {
+        dom.resultNote.querySelector('span').textContent = hasBoth
+          ? 'Giriş ve çıkış saatleri geçerli bir süre oluşturmuyor.'
+          : 'Sonuç, giriş ve çıkış saatleri girildiğinde güncellenir.';
+      }
       dom.breakDetail.textContent = 'Molalar çalışma süresine göre otomatik hesaplanır.';
     } else {
       const difference = netMinutes - TARGET_MINUTES;
@@ -461,7 +725,10 @@
 
     let note = 'Hesaplama için iki saati de girin.';
     let noteIsError = false;
-    if (hasBoth && netMinutes <= 0) {
+    if (startInvalid || endInvalid) {
+      note = 'Geçerli bir saat girin. 24 saat biçimi: SS:DD (örn. 17:30).';
+      noteIsError = true;
+    } else if (hasBoth && netMinutes <= 0) {
       note = 'Geçerli bir net mesai oluşmadı. Saatleri kontrol edin.';
       noteIsError = true;
     } else if (calculation) {
@@ -515,18 +782,61 @@
         const hours = state.workData[key] || 0;
         const hasHours = hours > 0;
         const isToday = key === toDateKey(today);
-        return `<div class="mini-day${hasHours ? ' has-hours' : ''}${isToday ? ' is-today' : ''}">
+        const label = `${formatDateLong(day)}, ${hasHours ? `${formatDuration(hours)} kayıtlı` : 'kayıt yok'}. Süre gir veya düzenle.`;
+        return `<button class="mini-day${hasHours ? ' has-hours' : ''}${isToday ? ' is-today' : ''}" type="button" data-week-date="${key}" aria-label="${label}">
           <span class="mini-day-name">${WEEKDAYS_SHORT[weekdayIndex(day)]}</span>
           <span class="mini-day-num">${day.getDate()}</span>
           <span class="mini-day-hours">${hasHours ? formatDuration(hours) : '—'}</span>
-        </div>`;
+        </button>`;
       })
       .join('');
   }
 
   function rememberTimes() {
-    if (dom.startTime.value) writeStorage(STORAGE.lastStart, dom.startTime.value);
-    if (dom.endTime.value) writeStorage(STORAGE.lastEnd, dom.endTime.value);
+    const start = formatTimeOfDay(dom.startTime.value);
+    const end = formatTimeOfDay(dom.endTime.value);
+    if (start) writeStorage(STORAGE.lastStart, start);
+    if (end) writeStorage(STORAGE.lastEnd, end);
+  }
+
+  function normalizeTimeInput(input) {
+    if (!input.value.trim()) return;
+    const formatted = formatTimeOfDay(input.value);
+    if (formatted) input.value = formatted;
+    updateDaily();
+    rememberTimes();
+  }
+
+  function autoFormatTimeInput(event) {
+    if (event.inputType && event.inputType.startsWith('delete')) return;
+
+    const input = event.target;
+    const raw = input.value;
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    const caret = input.selectionStart ?? raw.length;
+    const digitsBeforeCaret = raw.slice(0, caret).replace(/\D/g, '').length;
+
+    const validHourPrefix = Number(digits.slice(0, 2)) <= 23;
+    let formatted;
+    if (digits.length >= 3) {
+      const shorthand = digits.length === 3 && !raw.includes(':') && !validHourPrefix;
+      formatted = shorthand ? digits : `${digits.slice(0, 2)}:${digits.slice(2)}`;
+    } else if (digits.length === 2) {
+      formatted = validHourPrefix ? `${digits}:` : digits;
+    } else {
+      formatted = digits;
+    }
+
+    if (formatted === raw) return;
+    input.value = formatted;
+
+    if (digits.length === 2) {
+      input.setSelectionRange(formatted.length, formatted.length);
+      return;
+    }
+
+    const position = Math.min(digitsBeforeCaret <= 2 ? digitsBeforeCaret : digitsBeforeCaret + 1, formatted.length);
+    input.setSelectionRange(position, position);
   }
 
   /* ---------- Calendar view ---------- */
@@ -605,11 +915,20 @@
         const hasHours = hours > 0;
         const isToday = key === toDateKey(today);
         const label = `${formatDateLong(day)}, ${hasHours ? `${formatDuration(hours)} kayıtlı` : 'kayıt yok'}. Düzenle.`;
-        return `<button class="day-tile${hasHours ? ' has-hours' : ''}${isToday ? ' is-today' : ''}" type="button" data-date="${key}" aria-label="${label}">
-          <span class="day-name">${WEEKDAYS_SHORT[weekdayIndex(day)]}</span>
-          <span class="day-num">${day.getDate()}</span>
-          <span class="day-hours">${hasHours ? formatDuration(hours) : '—'}</span>
-        </button>`;
+        const clearLabel = `${formatDateLong(day)} kaydını temizle`;
+        const clearButton = hasHours
+          ? `<button class="day-clear" type="button" data-clear-date="${key}" title="${clearLabel}" aria-label="${clearLabel}">
+              <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+            </button>`
+          : '';
+        return `<div class="day-cell">
+          <button class="day-tile${hasHours ? ' has-hours' : ''}${isToday ? ' is-today' : ''}" type="button" data-date="${key}" aria-label="${label}">
+            <span class="day-name">${WEEKDAYS_SHORT[weekdayIndex(day)]}</span>
+            <span class="day-num">${day.getDate()}</span>
+            <span class="day-hours">${hasHours ? formatDuration(hours) : '—'}</span>
+          </button>
+          ${clearButton}
+        </div>`;
       })
       .join('');
 
@@ -622,15 +941,21 @@
       differenceChip = '<span class="week-diff is-positive">Hedefte</span>';
     }
 
+    const weekLabel = formatWeekRange(segment.start, segment.end, false);
     return `<article class="week-card${isCurrent ? ' is-current' : ''}" id="week-${toDateKey(segment.start)}">
       <div class="week-card-head">
         <div class="week-card-title">
-          <span class="week-range">${formatWeekRange(segment.start, segment.end, false)}</span>
+          <span class="week-range">${weekLabel}</span>
           ${isCurrent ? '<span class="week-badge">Bu hafta</span>' : ''}
         </div>
-        <div class="week-card-amount">
-          <strong>${formatMinutes(totals.total)}</strong>
-          <span>/ ${formatMinutes(totals.target)}</span>
+        <div class="week-card-actions">
+          <div class="week-card-amount">
+            <strong>${formatMinutes(totals.total)}</strong>
+            <span>/ ${formatMinutes(totals.target)}</span>
+          </div>
+          <button class="entry-clear" type="button" data-clear-week="${toDateKey(segment.start)}_${toDateKey(segment.end)}" title="${weekLabel} kayıtlarını temizle" aria-label="${weekLabel} kayıtlarını temizle">
+            <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
+          </button>
         </div>
       </div>
       <div class="week-card-meta">
@@ -640,6 +965,81 @@
       <div class="progress compact"><span${totals.total > totals.target ? ' class="is-over"' : ''} style="width: ${percent}%"></span></div>
       <div class="day-grid">${dayCells}</div>
     </article>`;
+  }
+
+  function removeRecords(keys) {
+    const removed = {};
+    keys.forEach((key) => {
+      if (state.workData[key] === undefined) return;
+      removed[key] = state.workData[key];
+      delete state.workData[key];
+    });
+    return removed;
+  }
+
+  function restoreRecords(removed) {
+    let restored = false;
+    Object.keys(removed).forEach((key) => {
+      if (state.workData[key] !== undefined) return;
+      state.workData[key] = removed[key];
+      restored = true;
+    });
+    if (!restored) return false;
+    if (!saveWorkData()) return false;
+    renderAllDataDependent();
+    return true;
+  }
+
+  function clearRecordsWithUndo(keys, message) {
+    const removed = removeRecords(keys);
+    if (!Object.keys(removed).length) return;
+    if (!saveWorkData()) return;
+    renderAllDataDependent();
+    showToast(message, {
+      type: 'success',
+      duration: 6500,
+      actionLabel: 'Geri al',
+      action: () => {
+        if (restoreRecords(removed)) {
+          showToast('Kayıtlar geri getirildi.', { type: 'success' });
+        }
+      }
+    });
+  }
+
+  function clearDayRecord(key) {
+    const date = fromDateKey(key);
+    if (!date || state.workData[key] === undefined) return;
+    clearRecordsWithUndo([key], `${formatDateLong(date)} kaydı temizlendi.`);
+  }
+
+  async function clearWeekRecords(startKey, endKey) {
+    const start = fromDateKey(startKey);
+    const end = fromDateKey(endKey);
+    if (!start || !end) return;
+    const keys = Object.keys(state.workData).filter((key) => key >= startKey && key <= endKey);
+    if (!keys.length) return;
+    const range = formatWeekRange(start, end, false);
+    const proceed = await confirmAction({
+      title: 'Hafta temizlensin mi?',
+      message: `${range} aralığındaki ${keys.length} günlük kayıt silinecek.`,
+      confirmLabel: 'Haftayı temizle'
+    });
+    if (!proceed) return;
+    clearRecordsWithUndo(keys, `${range} kayıtları temizlendi.`);
+  }
+
+  async function clearMonthRecords(month) {
+    const keys = Object.keys(state.workData).filter((key) => key.startsWith(`${month}-`));
+    if (!keys.length) return;
+    const label = monthLabelFromKey(month);
+    const proceed = await confirmAction({
+      title: 'Ay temizlensin mi?',
+      message: `${label} ayındaki ${keys.length} günlük kayıt silinecek.`,
+      confirmLabel: 'Ayı temizle'
+    });
+    if (!proceed) return;
+    clearRecordsWithUndo(keys, `${label} kayıtları temizlendi.`);
   }
 
   function renderCalendar() {
@@ -680,6 +1080,9 @@
           <div class="month-heading">
             <h2>${monthLabelFromKey(group.key)}</h2>
             <span>${group.segments.length} hafta</span>
+            <button class="entry-clear" type="button" data-clear-month="${group.key}" title="${monthLabelFromKey(group.key)} ayının kayıtlarını temizle" aria-label="${monthLabelFromKey(group.key)} ayının kayıtlarını temizle">
+              <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
+            </button>
           </div>
           <div class="weeks-grid">${group.segments.map(renderWeekCard).join('')}</div>
         </section>`
@@ -702,21 +1105,6 @@
     dom.statDays.textContent = `${keys.length} gün`;
     dom.statTotal.textContent = formatMinutes(totalMinutes);
     dom.statWeek.innerHTML = `${formatMinutes(weekMinutes)} <small>/ ${formatMinutes(40 * 60)}</small>`;
-  }
-
-  function goToCurrentWeek() {
-    if (state.calendarFilter !== 'all') {
-      state.calendarFilter = 'all';
-      renderCalendar();
-    }
-    window.requestAnimationFrame(() => {
-      const current = $('.week-card.is-current');
-      if (current) {
-        current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    });
   }
 
   /* ---------- Settings ---------- */
@@ -742,6 +1130,7 @@
     dom.reminderOptions.hidden = !state.reminders.enabled;
     dom.reminderTime.value = state.reminders.time;
     updatePermissionUi();
+    updateReminderStatus();
   }
 
   function notificationSupport() {
@@ -750,6 +1139,7 @@
 
   function permissionState() {
     if (!notificationSupport()) return 'unsupported';
+    if (!window.isSecureContext && Notification.permission !== 'granted') return 'insecure';
     return Notification.permission;
   }
 
@@ -760,6 +1150,7 @@
       granted: 'Bildirim izni verildi.',
       default: 'Bildirim izni henüz verilmedi.',
       denied: 'Bildirim izni engellendi. Tarayıcı ayarlarından izin verebilirsiniz.',
+      insecure: 'Bildirimler yalnızca HTTPS veya localhost üzerinde çalışır.',
       unsupported: 'Bu tarayıcı bildirimleri desteklemiyor.'
     };
     dom.permissionStatus.textContent = labels[permission];
@@ -768,14 +1159,70 @@
     dom.testNotificationBtn.disabled = false;
   }
 
+  function updateReminderStatus() {
+    if (!dom.reminderStatus) return;
+    if (!state.reminders.enabled) {
+      dom.reminderStatus.textContent = '';
+      return;
+    }
+
+    const permission = permissionState();
+    if (permission === 'insecure') {
+      dom.reminderStatus.textContent =
+        'Hatırlatıcı, sayfa açıkken uygulama içinde gösterilecek. Masaüstü bildirimi için uygulamayı HTTPS üzerinden veya localhost’ta açın.';
+      return;
+    }
+    if (permission === 'denied') {
+      dom.reminderStatus.textContent =
+        'Hatırlatıcı, sayfa açıkken uygulama içinde gösterilecek. Masaüstü bildirimi için tarayıcı ayarlarından bildirim iznini açın.';
+      return;
+    }
+    if (permission === 'unsupported') {
+      dom.reminderStatus.textContent = 'Bu tarayıcı bildirimleri desteklemiyor. Hatırlatıcı sayfa içinde gösterilecek.';
+      return;
+    }
+
+    const now = new Date();
+    const weekday = now.getDay();
+    const todayKey = toDateKey(now);
+    const parts = state.reminders.time.split(':');
+    const targetMinutes = Number(parts[0]) * 60 + Number(parts[1]);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let message;
+    if (weekday === 0 || weekday === 6) {
+      message = 'Bugün hafta sonu. Hatırlatıcı hafta içi günlerde çalışır.';
+    } else if (state.workData[todayKey]) {
+      message = `Bugün için ${formatDuration(state.workData[todayKey])} kayıtlı. Hatırlatıcı gönderilmeyecek.`;
+    } else if (nowMinutes < targetMinutes) {
+      message = `Bugün saat ${state.reminders.time}’de hatırlatılacak.`;
+    } else {
+      message = `Hatırlatma saati (${state.reminders.time}) geçti. Sayfa açıkken kısa süre içinde hatırlatılacak.`;
+    }
+
+    if (permission === 'default') {
+      message += ' Bildirim izni verilmediği için hatırlatıcı sayfa içinde gösterilir.';
+    }
+    dom.reminderStatus.textContent = message;
+  }
+
   async function requestNotificationPermission() {
     if (!notificationSupport()) {
       showToast('Bu tarayıcı bildirimleri desteklemiyor. Hatırlatıcı sayfa içinde gösterilecek.', { type: 'info' });
       return 'unsupported';
     }
+    if (!window.isSecureContext && Notification.permission !== 'granted') {
+      updatePermissionUi();
+      showToast('Bildirimler yalnızca HTTPS veya localhost üzerinde çalışır. Hatırlatıcı sayfa içinde gösterilecek.', {
+        type: 'info',
+        duration: 7000
+      });
+      return 'insecure';
+    }
     try {
       const permission = await Notification.requestPermission();
       updatePermissionUi();
+      updateReminderStatus();
       if (permission === 'granted') {
         showToast('Bildirim izni verildi.', { type: 'success' });
       } else if (permission === 'denied') {
@@ -784,6 +1231,7 @@
       return permission;
     } catch (error) {
       updatePermissionUi();
+      updateReminderStatus();
       showToast('Bildirim izni istenirken bir sorun oluştu.', { type: 'error' });
       return 'default';
     }
@@ -1140,10 +1588,132 @@
     state.workData[key] = roundHours(minutes);
     rememberTimes();
     if (!saveWorkData()) return;
+    recordPresetUsage(dom.startTime.value, dom.endTime.value);
 
     closeDialog(dom.addDialog);
     renderAllDataDependent();
     showToast(`${formatDateLong(date)} için ${formatMinutes(minutes)} takvime eklendi.`, {
+      type: 'success',
+      duration: 6000,
+      actionLabel: 'Takvimi aç',
+      action: () => setTab('calendar')
+    });
+  }
+
+  /* ---------- Manual calendar entry ---------- */
+
+  function manualWeekDays() {
+    const monday = startOfWeek(todayDate());
+    return Array.from({ length: 6 }, (_, index) => addDays(monday, index));
+  }
+
+  function renderManualWeekDays() {
+    const days = manualWeekDays();
+    dom.manualWeekRange.textContent = formatWeekRange(days[0], days[5], true);
+    dom.manualWeekDays.innerHTML = days
+      .map((day) => {
+        const key = toDateKey(day);
+        const minutes = Math.round((state.workData[key] || 0) * 60);
+        const hasRecord = minutes > 0;
+        const isToday = key === toDateKey(todayDate());
+        const label = `${formatDateLong(day)}, ${hasRecord ? `${formatMinutes(minutes)} kayıtlı` : 'kayıt yok'}. Seç.`;
+        return `<button class="chip week-day-chip${hasRecord ? ' has-record' : ''}${isToday ? ' is-today' : ''}" type="button" data-manual-date="${key}" aria-label="${label}">
+          <span>${WEEKDAYS_SHORT[weekdayIndex(day)]}</span>
+          <strong>${day.getDate()}</strong>
+          ${hasRecord ? `<small>${formatMinutes(minutes)}</small>` : ''}
+        </button>`;
+      })
+      .join('');
+  }
+
+  function setManualDate(date) {
+    dom.manualDate.value = toDateKey(date);
+    updateManualDateUi();
+  }
+
+  function updateManualDateUi() {
+    const date = fromDateKey(dom.manualDate.value);
+    const selectedKey = date ? toDateKey(date) : '';
+    $$('#manualWeekDays [data-manual-date]').forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.manualDate === selectedKey);
+    });
+
+    if (!date) {
+      dom.manualDateLabel.textContent = 'Geçerli bir gün seçin.';
+      dom.manualError.textContent = '';
+      dom.manualSubmit.disabled = true;
+      dom.manualExisting.className = 'existing-note';
+      dom.manualExisting.textContent = '';
+      return;
+    }
+
+    const isSunday = date.getDay() === 0;
+    dom.manualDateLabel.textContent = formatDateLong(date);
+    dom.manualError.textContent = isSunday ? 'Pazar günleri takvime kayıt eklenemez.' : '';
+    dom.manualSubmit.disabled = isSunday;
+
+    const existingHours = state.workData[toDateKey(date)] || 0;
+    if (existingHours > 0) {
+      dom.manualExisting.className = 'existing-note is-warning';
+      dom.manualExisting.textContent = `Bu günde ${formatDuration(existingHours)} kayıt var. Kaydedince üzerine yazılacak.`;
+    } else {
+      dom.manualExisting.className = 'existing-note';
+      dom.manualExisting.textContent = '';
+    }
+  }
+
+  function openManualDialog() {
+    dom.manualForm.reset();
+    dom.manualDuration.value = '';
+    dom.manualError.textContent = '';
+    renderManualWeekDays();
+    setManualDate(defaultAddDate());
+    openDialog(dom.manualDialog);
+
+    window.setTimeout(() => {
+      try {
+        dom.manualDuration.focus({ preventScroll: true });
+        dom.manualDuration.select();
+      } catch (error) {
+        dom.manualDuration.focus();
+        dom.manualDuration.select();
+      }
+    }, 60);
+  }
+
+  function submitManualDialog(event) {
+    event.preventDefault();
+    const minutes = parseDuration(dom.manualDuration.value);
+    if (minutes === null) {
+      dom.manualError.textContent = 'Geçerli bir süre girin. 24 saat biçimi: SS:DD (örn. 08:30).';
+      dom.manualDuration.focus();
+      return;
+    }
+    if (minutes <= 0) {
+      dom.manualError.textContent = 'Süre 00:00’dan büyük olmalı.';
+      dom.manualDuration.focus();
+      return;
+    }
+
+    const date = fromDateKey(dom.manualDate.value);
+    if (!date) {
+      dom.manualError.textContent = 'Lütfen geçerli bir gün seçin.';
+      return;
+    }
+    if (date.getDay() === 0) {
+      dom.manualError.textContent = 'Pazar günleri takvime kayıt eklenemez.';
+      return;
+    }
+
+    const key = toDateKey(date);
+    state.workData[key] = roundHours(minutes);
+    if (!saveWorkData()) return;
+    recordDurationUsage(minutes);
+
+    if (state.calendarFilter !== 'all') state.calendarFilter = monthKey(date);
+    closeDialog(dom.manualDialog);
+    renderAllDataDependent();
+    showToast(`${formatDateLong(date)} için ${formatMinutes(minutes)} takvime kaydedildi.`, {
       type: 'success',
       duration: 6000,
       actionLabel: 'Takvimi aç',
@@ -1160,7 +1730,7 @@
     const hours = state.workData[key] || 0;
     const minutes = Math.round(hours * 60);
 
-    dom.editTitle.textContent = 'Günü düzenle';
+    dom.editTitle.textContent = minutes > 0 ? 'Günü düzenle' : 'Güne süre ekle';
     dom.editDate.textContent = formatDateLong(date);
     dom.editDuration.value = minutes > 0 ? formatMinutes(minutes) : '';
     dom.editError.textContent = '';
@@ -1183,7 +1753,7 @@
     if (!state.editingDate) return;
     const minutes = parseDuration(dom.editDuration.value);
     if (minutes === null) {
-      dom.editError.textContent = 'Geçerli bir süre girin. Örnek: 08:30';
+      dom.editError.textContent = 'Geçerli bir süre girin. 24 saat biçimi: SS:DD (örn. 08:30).';
       return;
     }
     if (minutes === 0) {
@@ -1192,6 +1762,7 @@
       state.workData[state.editingDate] = roundHours(minutes);
     }
     if (!saveWorkData()) return;
+    if (minutes > 0) recordDurationUsage(minutes);
     const date = fromDateKey(state.editingDate);
     closeDialog(dom.editDialog);
     state.editingDate = null;
@@ -1228,6 +1799,7 @@
     renderWeekSnapshot();
     renderCalendar();
     renderSettingsData();
+    updateReminderStatus();
   }
 
   /* ---------- Service worker and install ---------- */
@@ -1241,44 +1813,6 @@
     });
   }
 
-  function setupInstallPrompt() {
-    window.addEventListener('beforeinstallprompt', (event) => {
-      event.preventDefault();
-      state.installPrompt = event;
-      dom.installRow.hidden = false;
-    });
-
-    window.addEventListener('appinstalled', () => {
-      state.installPrompt = null;
-      dom.installRow.hidden = true;
-      showToast('Horalator ana ekrana eklendi.', { type: 'success' });
-    });
-
-    dom.installBtn.addEventListener('click', async () => {
-      if (!state.installPrompt) return;
-      state.installPrompt.prompt();
-      try {
-        await state.installPrompt.userChoice;
-      } catch (error) {
-        /* The prompt can be dismissed by the browser. */
-      }
-      state.installPrompt = null;
-      dom.installRow.hidden = true;
-    });
-  }
-
-  async function refreshApp() {
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.update()));
-      }
-    } catch (error) {
-      /* A normal reload still works if updating fails. */
-    }
-    window.location.reload();
-  }
-
   /* ---------- Event wiring ---------- */
 
   function cacheDom() {
@@ -1287,6 +1821,8 @@
     dom.dailyForm = $('#dailyForm');
     dom.startTime = $('#startTime');
     dom.endTime = $('#endTime');
+    dom.startTimeClear = $('#startTimeClear');
+    dom.endTimeClear = $('#endTimeClear');
     dom.dinnerRow = $('#dinnerRow');
     dom.dinnerToggle = $('#dinnerToggle');
     dom.dinnerHint = $('#dinnerHint');
@@ -1313,7 +1849,8 @@
     dom.calendarEmpty = $('#calendarEmpty');
     dom.calendarFilterWrap = $('#calendarFilterWrap');
     dom.calendarFilter = $('#calendarFilter');
-    dom.calendarTodayBtn = $('#calendarTodayBtn');
+    dom.calendarManualBtn = $('#calendarManualBtn');
+    dom.calendarEmptyManualBtn = $('#calendarEmptyManualBtn');
     dom.statDays = $('#statDays');
     dom.statTotal = $('#statTotal');
     dom.statWeek = $('#statWeek');
@@ -1322,15 +1859,15 @@
     dom.exportBtn = $('#exportBtn');
     dom.importBtn = $('#importBtn');
     dom.importFile = $('#importFile');
+    dom.quickPresetChips = $('#quickPresetChips');
+    dom.clearPresetsBtn = $('#clearPresetsBtn');
     dom.remindersToggle = $('#remindersToggle');
     dom.reminderOptions = $('#reminderOptions');
     dom.reminderTime = $('#reminderTime');
     dom.permissionStatus = $('#permissionStatus');
     dom.permissionBtn = $('#permissionBtn');
     dom.testNotificationBtn = $('#testNotificationBtn');
-    dom.installRow = $('#installRow');
-    dom.installBtn = $('#installBtn');
-    dom.refreshAppBtn = $('#refreshAppBtn');
+    dom.reminderStatus = $('#reminderStatus');
     dom.toastRegion = $('#toastRegion');
     dom.addDialog = $('#addDialog');
     dom.addForm = $('#addForm');
@@ -1345,8 +1882,22 @@
     dom.editTitle = $('#editTitle');
     dom.editDate = $('#editDate');
     dom.editDuration = $('#editDuration');
+    dom.editDurationChips = $('#editDurationChips');
+    dom.clearDurationsEditBtn = $('#clearDurationsEditBtn');
     dom.editError = $('#editError');
     dom.editDelete = $('#editDelete');
+    dom.manualDialog = $('#manualDialog');
+    dom.manualForm = $('#manualForm');
+    dom.manualDuration = $('#manualDuration');
+    dom.manualDurationChips = $('#manualDurationChips');
+    dom.clearDurationsBtn = $('#clearDurationsBtn');
+    dom.manualDate = $('#manualDate');
+    dom.manualDateLabel = $('#manualDateLabel');
+    dom.manualWeekRange = $('#manualWeekRange');
+    dom.manualWeekDays = $('#manualWeekDays');
+    dom.manualError = $('#manualError');
+    dom.manualExisting = $('#manualExisting');
+    dom.manualSubmit = $('#manualSubmit');
     dom.confirmDialog = $('#confirmDialog');
     dom.confirmTitle = $('#confirmTitle');
     dom.confirmMessage = $('#confirmMessage');
@@ -1388,26 +1939,42 @@
       openAddDialog();
     });
 
-    dom.startTime.addEventListener('input', updateDaily);
-    dom.endTime.addEventListener('input', updateDaily);
-    dom.startTime.addEventListener('change', () => {
-      updateDaily();
-      rememberTimes();
-    });
-    dom.endTime.addEventListener('change', () => {
-      updateDaily();
-      rememberTimes();
-    });
-    dom.dinnerToggle.addEventListener('change', updateDaily);
-
-    $$('.preset-row [data-start][data-end]').forEach((button) => {
-      button.addEventListener('click', () => {
-        dom.startTime.value = button.dataset.start;
-        dom.endTime.value = button.dataset.end;
+    [dom.startTime, dom.endTime].forEach((input) => {
+      input.addEventListener('input', updateDaily);
+      input.addEventListener('change', () => {
         updateDaily();
         rememberTimes();
-        dom.startTime.focus();
       });
+      input.addEventListener('blur', () => normalizeTimeInput(input));
+    });
+    [
+      [dom.startTimeClear, dom.startTime],
+      [dom.endTimeClear, dom.endTime]
+    ].forEach(([button, input]) => {
+      if (!button) return;
+      button.addEventListener('click', () => {
+        input.value = '';
+        updateDaily();
+        input.focus();
+      });
+    });
+    [dom.startTime, dom.endTime, dom.reminderTime, dom.manualDuration, dom.editDuration]
+      .filter(Boolean)
+      .forEach((input) => input.addEventListener('input', autoFormatTimeInput));
+    dom.dinnerToggle.addEventListener('change', updateDaily);
+
+    dom.quickPresetChips.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-start][data-end]');
+      if (!button) return;
+      dom.startTime.value = button.dataset.start;
+      dom.endTime.value = button.dataset.end;
+      updateDaily();
+      rememberTimes();
+      dom.startTime.focus();
+    });
+    dom.clearPresetsBtn.addEventListener('click', clearFrequentPresets);
+    [dom.clearDurationsBtn, dom.clearDurationsEditBtn].forEach((button) => {
+      if (button) button.addEventListener('click', clearFrequentDurations);
     });
 
     dom.addForm.addEventListener('submit', submitAddDialog);
@@ -1418,6 +1985,34 @@
       });
     });
 
+    dom.calendarManualBtn.addEventListener('click', openManualDialog);
+    dom.calendarEmptyManualBtn.addEventListener('click', openManualDialog);
+    dom.manualForm.addEventListener('submit', submitManualDialog);
+    dom.manualDuration.addEventListener('input', () => {
+      dom.manualError.textContent = '';
+    });
+    dom.manualDuration.addEventListener('blur', () => {
+      const minutes = parseDuration(dom.manualDuration.value);
+      if (minutes !== null) dom.manualDuration.value = formatMinutes(minutes);
+    });
+    dom.manualDurationChips.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-duration]');
+      if (!button) return;
+      dom.manualDuration.value = button.dataset.duration;
+      dom.manualError.textContent = '';
+      dom.manualDuration.focus();
+    });
+    dom.manualWeekDays.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-manual-date]');
+      if (!button) return;
+      const date = fromDateKey(button.dataset.manualDate);
+      if (date) setManualDate(date);
+    });
+    dom.manualDate.addEventListener('change', updateManualDateUi);
+    dom.manualDialog.addEventListener('close', () => {
+      dom.manualError.textContent = '';
+    });
+
     dom.editForm.addEventListener('submit', submitEditDialog);
     dom.editDuration.addEventListener('input', () => {
       dom.editError.textContent = '';
@@ -1426,12 +2021,12 @@
       const minutes = parseDuration(dom.editDuration.value);
       if (minutes !== null) dom.editDuration.value = formatMinutes(minutes);
     });
-    $$('#editQuick [data-duration]').forEach((button) => {
-      button.addEventListener('click', () => {
-        dom.editDuration.value = button.dataset.duration;
-        dom.editError.textContent = '';
-        dom.editDuration.focus();
-      });
+    dom.editDurationChips.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-duration]');
+      if (!button) return;
+      dom.editDuration.value = button.dataset.duration;
+      dom.editError.textContent = '';
+      dom.editDuration.focus();
     });
     dom.editDelete.addEventListener('click', deleteEditingDay);
 
@@ -1443,7 +2038,27 @@
       dom.editError.textContent = '';
     });
 
+    dom.weekMiniDays.addEventListener('click', (event) => {
+      const day = event.target.closest('[data-week-date]');
+      if (day) openEditDialog(day.dataset.weekDate);
+    });
     dom.calendarContent.addEventListener('click', (event) => {
+      const dayClear = event.target.closest('[data-clear-date]');
+      if (dayClear) {
+        clearDayRecord(dayClear.dataset.clearDate);
+        return;
+      }
+      const weekClear = event.target.closest('[data-clear-week]');
+      if (weekClear) {
+        const [start, end] = weekClear.dataset.clearWeek.split('_');
+        if (start && end) clearWeekRecords(start, end);
+        return;
+      }
+      const monthClear = event.target.closest('[data-clear-month]');
+      if (monthClear) {
+        clearMonthRecords(monthClear.dataset.clearMonth);
+        return;
+      }
       const tile = event.target.closest('[data-date]');
       if (tile) openEditDialog(tile.dataset.date);
     });
@@ -1451,8 +2066,6 @@
       state.calendarFilter = dom.calendarFilter.value;
       renderCalendar();
     });
-    dom.calendarTodayBtn.addEventListener('click', goToCurrentWeek);
-
     dom.exportBtn.addEventListener('click', exportData);
     dom.importBtn.addEventListener('click', () => dom.importFile.click());
     dom.importFile.addEventListener('change', async () => {
@@ -1476,17 +2089,25 @@
     });
 
     dom.reminderTime.addEventListener('change', () => {
-      if (!dom.reminderTime.value) {
-        dom.reminderTime.value = '18:00';
+      const normalized = formatTimeOfDay(dom.reminderTime.value);
+      if (!normalized) {
+        dom.reminderTime.value = state.reminders.time;
+        showToast('Geçerli bir saat girin. 24 saat biçimi: SS:DD (örn. 18:00).', { type: 'error' });
+        return;
       }
-      state.reminders.time = dom.reminderTime.value;
+      dom.reminderTime.value = normalized;
+      state.reminders.time = normalized;
       writeStorage(STORAGE.reminderTime, state.reminders.time);
+      updateReminderStatus();
       showToast(`Hatırlatma saati ${state.reminders.time} olarak ayarlandı.`, { type: 'success' });
+    });
+    dom.reminderTime.addEventListener('blur', () => {
+      const normalized = formatTimeOfDay(dom.reminderTime.value);
+      if (normalized) dom.reminderTime.value = normalized;
     });
 
     dom.permissionBtn.addEventListener('click', requestNotificationPermission);
     dom.testNotificationBtn.addEventListener('click', testNotification);
-    dom.refreshAppBtn.addEventListener('click', refreshApp);
 
     window.addEventListener('hashchange', () => {
       const tab = window.location.hash.replace('#', '');
@@ -1506,6 +2127,12 @@
       } else if (event.key === STORAGE.reminderEnabled || event.key === STORAGE.reminderTime) {
         state.reminders = loadReminderSettings();
         updateReminderUi();
+      } else if (event.key === STORAGE.frequentPresets) {
+        state.frequentPresets = loadFrequentPresets();
+        renderQuickPresets();
+      } else if (event.key === STORAGE.frequentDurations) {
+        state.frequentDurations = loadFrequentDurations();
+        renderDurationPresets();
       }
     });
 
@@ -1540,27 +2167,32 @@
     setupDialogs();
 
     state.workData = loadWorkData();
+    state.frequentPresets = loadFrequentPresets();
+    state.frequentDurations = loadFrequentDurations();
     state.themeSetting = readStorage(STORAGE.theme) || 'system';
     state.reminders = loadReminderSettings();
     state.lastRenderDate = toDateKey(new Date());
 
     applyTheme(state.themeSetting, false);
 
-    const lastStart = readStorage(STORAGE.lastStart);
-    const lastEnd = readStorage(STORAGE.lastEnd);
-    if (lastStart && /^\d{2}:\d{2}$/.test(lastStart)) dom.startTime.value = lastStart;
-    if (lastEnd && /^\d{2}:\d{2}$/.test(lastEnd)) dom.endTime.value = lastEnd;
+    const lastStart = formatTimeOfDay(readStorage(STORAGE.lastStart) || '');
+    const lastEnd = formatTimeOfDay(readStorage(STORAGE.lastEnd) || '');
+    if (lastStart) dom.startTime.value = lastStart;
+    if (lastEnd) dom.endTime.value = lastEnd;
 
     dom.addDate.min = '2020-01-01';
     dom.addDate.max = '2100-12-31';
+    dom.manualDate.min = '2020-01-01';
+    dom.manualDate.max = '2100-12-31';
 
     setupEvents();
     updateTodayUi();
     updateDaily();
     updateReminderUi();
     updatePermissionUi();
+    renderQuickPresets();
+    renderDurationPresets();
     renderAllDataDependent();
-    setupInstallPrompt();
     registerServiceWorker();
 
     const initialTab = window.location.hash.replace('#', '');

@@ -58,6 +58,7 @@
     <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
     <symbol id="icon-bell-off" viewBox="0 0 24 24"><path d="M13.73 21a2 2 0 0 1-3.46 0M18.63 13A17.9 17.9 0 0 1 18 8M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.33-5M2 2l20 20"/></symbol>
     <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.47 6.03.88-4.36 4.25 1.03 6.01L12 16.77 6.6 19.61l1.03-6.01L3.27 9.35l6.03-.88L12 3z"/></symbol>
     <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-6"/></symbol>
     <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></symbol>
     <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12l2 2 4-4"/></symbol>
@@ -106,7 +107,6 @@
       <section class="view" id="view-daily" aria-labelledby="dailyTitle">
         <div class="page-head">
           <div class="page-head-copy">
-            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg> Günlük hesaplama</p>
             <h1 id="dailyTitle">Bugün kaç saat çalıştın?</h1>
             <p class="lead">Giriş ve çıkış saatini gir; molaları ve net mesaiyi anında hesaplayalım.</p>
           </div>
@@ -122,32 +122,42 @@
               <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
               <div>
                 <h2>Mesai bilgileri</h2>
-                <p>Saatler 24 saat formatındadır.</p>
+                <p>Saatler 24 saat biçimindedir (SS:DD).</p>
               </div>
             </div>
 
             <form id="dailyForm" novalidate>
               <div class="time-grid">
-                <label class="time-field" for="startTime">
-                  <span class="time-icon"><svg class="icon" aria-hidden="true"><use href="#icon-log-in"/></svg></span>
-                  <span class="time-field-body">
-                    <span class="time-label">Giriş saati</span>
-                    <input id="startTime" name="startTime" type="time" step="60" autocomplete="off" aria-describedby="calcNote">
-                  </span>
-                </label>
-                <label class="time-field" for="endTime">
-                  <span class="time-icon time-icon-end"><svg class="icon" aria-hidden="true"><use href="#icon-log-out"/></svg></span>
-                  <span class="time-field-body">
-                    <span class="time-label">Çıkış saati</span>
-                    <input id="endTime" name="endTime" type="time" step="60" autocomplete="off" aria-describedby="calcNote">
-                  </span>
-                </label>
+                <div class="time-field">
+                  <label class="time-field-main" for="startTime">
+                    <span class="time-icon"><svg class="icon" aria-hidden="true"><use href="#icon-log-in"/></svg></span>
+                    <span class="time-field-body">
+                      <span class="time-label">Giriş saati</span>
+                      <input class="time-input" id="startTime" name="startTime" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="08:00" spellcheck="false" aria-describedby="calcNote">
+                    </span>
+                  </label>
+                  <button class="field-clear" type="button" id="startTimeClear" title="Giriş saatini temizle" aria-label="Giriş saatini temizle" hidden>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+                  </button>
+                </div>
+                <div class="time-field">
+                  <label class="time-field-main" for="endTime">
+                    <span class="time-icon time-icon-end"><svg class="icon" aria-hidden="true"><use href="#icon-log-out"/></svg></span>
+                    <span class="time-field-body">
+                      <span class="time-label">Çıkış saati</span>
+                      <input class="time-input" id="endTime" name="endTime" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="17:00" spellcheck="false" aria-describedby="calcNote">
+                    </span>
+                  </label>
+                  <button class="field-clear" type="button" id="endTimeClear" title="Çıkış saatini temizle" aria-label="Çıkış saatini temizle" hidden>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+                  </button>
+                </div>
               </div>
 
-              <div class="preset-row" aria-label="Hızlı saat seçenekleri">
-                <span>Hızlı doldur</span>
-                <button class="chip" type="button" data-start="08:00" data-end="17:00">08:00 – 17:00</button>
-                <button class="chip" type="button" data-start="09:00" data-end="18:00">09:00 – 18:00</button>
+              <div class="preset-row" id="quickPresetRow" aria-label="Hızlı saat seçenekleri">
+                <span class="preset-label">Hızlı doldur</span>
+                <span class="preset-chips" id="quickPresetChips" aria-live="polite"></span>
+                <button class="preset-clear" type="button" id="clearPresetsBtn" title="Sık kullanılan saatleri temizle" hidden>Temizle</button>
               </div>
 
               <div class="toggle-row" id="dinnerRow">
@@ -248,6 +258,7 @@
             </div>
           </div>
           <div class="mini-week" id="weekMiniDays"></div>
+          <p class="mini-week-hint">Süre girmek veya düzenlemek için bir güne tıklayın.</p>
         </article>
 
         <details class="card rules-card">
@@ -269,7 +280,6 @@
       <section class="view" id="view-calendar" aria-labelledby="calendarTitle" hidden>
         <div class="page-head">
           <div class="page-head-copy">
-            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg> Mesai takibi</p>
             <h1 id="calendarTitle">Takvim</h1>
             <p class="lead">Haftalık hedefinizi ve günlük kayıtlarınızı tek bakışta görün.</p>
           </div>
@@ -280,13 +290,9 @@
                 <option value="all">Tüm zamanlar</option>
               </select>
             </label>
-            <button class="btn btn-secondary btn-sm" type="button" id="calendarTodayBtn">
-              <svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg>
-              Bugüne git
-            </button>
-            <button class="btn btn-primary btn-sm" type="button" data-tab="daily">
+            <button class="btn btn-primary btn-sm" type="button" id="calendarManualBtn">
               <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
-              Mesai ekle
+              Süre ekle
             </button>
           </div>
         </div>
@@ -320,11 +326,13 @@
         <div class="empty-state card" id="calendarEmpty" hidden>
           <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg></span>
           <h2>Takvim henüz boş</h2>
-          <p>Günlük mesainizi hesaplayıp takvime eklediğinizde haftalık özetiniz burada görünecek.</p>
-          <button class="btn btn-primary" type="button" data-tab="daily">
-            <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
-            İlk mesaiyi ekle
-          </button>
+          <p>Günlük mesainizi hesaplayıp takvime ekleyin veya çalıştığınız süreyi doğrudan girin.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" type="button" id="calendarEmptyManualBtn">
+              <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
+              Manuel süre ekle
+            </button>
+          </div>
         </div>
       </section>
 
@@ -332,7 +340,6 @@
       <section class="view" id="view-settings" aria-labelledby="settingsTitle" hidden>
         <div class="page-head">
           <div class="page-head-copy">
-            <p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg> Tercihler</p>
             <h1 id="settingsTitle">Ayarlar</h1>
             <p class="lead">Görünümü, yedeklerinizi ve hatırlatıcılarınızı yönetin.</p>
           </div>
@@ -371,7 +378,6 @@
               </label>
             </div>
           </section>
-
           <section class="card settings-card" aria-labelledby="dataTitle">
             <div class="card-heading compact">
               <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-database"/></svg></span>
@@ -409,7 +415,6 @@
               Tüm kayıtları sil
             </button>
           </section>
-
           <section class="card settings-card" aria-labelledby="remindersTitle">
             <div class="card-heading compact">
               <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-bell"/></svg></span>
@@ -435,9 +440,9 @@
                   <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg></span>
                   <div class="setting-copy">
                     <span class="setting-title">Hatırlatma saati</span>
-                    <span class="setting-sub">Kayıt girilmemişse bildirim gönderilir</span>
+                    <span class="setting-sub">24 saat biçimi (SS:DD). Kayıt girilmemişse bildirim gönderilir</span>
                   </div>
-                  <input class="time-input-small" type="time" id="reminderTime" step="60" aria-label="Hatırlatma saati">
+                  <input class="time-input-small" type="text" id="reminderTime" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="18:00" spellcheck="false" aria-label="Hatırlatma saati, 24 saat biçimi">
                 </div>
                 <div class="permission-row">
                   <div>
@@ -450,56 +455,13 @@
                   <svg class="icon" aria-hidden="true"><use href="#icon-bell"/></svg>
                   Bildirimi dene
                 </button>
+                <p class="reminder-status" id="reminderStatus"></p>
               </div>
             </div>
             <p class="note">
               <svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg>
               <span>Tarayıcı bildirimleri yalnızca Horalator açıkken çalışır. Telefonda uygulamayı ana ekranınıza ekleyebilirsiniz.</span>
             </p>
-          </section>
-
-          <section class="card settings-card" aria-labelledby="aboutTitle">
-            <div class="card-heading compact">
-              <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#icon-info-circle"/></svg></span>
-              <div>
-                <h2 id="aboutTitle">Hakkında</h2>
-                <p>Horalator Web</p>
-              </div>
-            </div>
-            <p class="about-text">Android sürümüyle aynı hesaplama kurallarını kullanan, tamamen tarayıcıda çalışan mesai hesaplayıcı.</p>
-            <div class="setting-list">
-              <div class="setting-row" id="installRow" hidden>
-                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-smartphone"/></svg></span>
-                <div class="setting-copy">
-                  <span class="setting-title">Ana ekrana ekle</span>
-                  <span class="setting-sub">Uygulama gibi aç, çevrimdışı kullan</span>
-                </div>
-                <button class="btn btn-secondary btn-sm" type="button" id="installBtn">Yükle</button>
-              </div>
-              <a class="setting-row setting-link" href="https://play.google.com/store/apps/details?id=com.renda.horalator" target="_blank" rel="noopener noreferrer">
-                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-smartphone"/></svg></span>
-                <div class="setting-copy">
-                  <span class="setting-title">Android sürümü</span>
-                  <span class="setting-sub">Google Play Store'da görüntüle</span>
-                </div>
-                <svg class="icon link-icon" aria-hidden="true"><use href="#icon-external-link"/></svg>
-              </a>
-              <a class="setting-row setting-link" href="https://doc-hosting.flycricket.io/horalator-privacy-policy/d2f9b5fe-f765-4b13-92c7-437603bcca2b/privacy" target="_blank" rel="noopener noreferrer">
-                <span class="setting-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"/></svg></span>
-                <div class="setting-copy">
-                  <span class="setting-title">Gizlilik politikası</span>
-                  <span class="setting-sub">Verilerinizin nasıl işlendiğini öğrenin</span>
-                </div>
-                <svg class="icon link-icon" aria-hidden="true"><use href="#icon-external-link"/></svg>
-              </a>
-            </div>
-            <div class="version-row">
-              <span>Web sürümü 1.0.0</span>
-              <button class="btn btn-ghost btn-sm" type="button" id="refreshAppBtn">
-                <svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>
-                Yenile
-              </button>
-            </div>
           </section>
         </div>
       </section>
@@ -590,13 +552,13 @@
       <div class="form-field">
         <label class="field-label" for="editDuration">Çalışılan süre</label>
         <input class="duration-input" type="text" id="editDuration" name="editDuration" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="08:30" aria-describedby="editError">
-        <p class="field-helper">Saat:dakika biçiminde girin. 00:00 kaydı siler.</p>
+        <p class="field-helper">24 saat biçimi (SS:DD). 00:00 kaydı siler.</p>
       </div>
 
-      <div class="quick-row" id="editQuick">
-        <button class="chip" type="button" data-duration="08:00">08:00</button>
-        <button class="chip" type="button" data-duration="08:30">08:30</button>
-        <button class="chip" type="button" data-duration="09:00">09:00</button>
+      <div class="preset-row preset-row-modal" aria-label="Hızlı süre seçenekleri">
+        <span class="preset-label">Hızlı doldur</span>
+        <span class="preset-chips" id="editDurationChips"></span>
+        <button class="preset-clear" type="button" id="clearDurationsEditBtn" title="Sık kullanılan süreleri temizle" hidden>Temizle</button>
       </div>
 
       <p class="field-error" id="editError" role="alert"></p>
@@ -610,6 +572,61 @@
           <button class="btn btn-ghost" type="button" data-close-dialog="editDialog">Vazgeç</button>
           <button class="btn btn-primary" type="submit">
             <svg class="icon" aria-hidden="true"><use href="#icon-check"/></svg>
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MANUEL SÜRE EKLE -->
+  <dialog class="modal" id="manualDialog" aria-labelledby="manualTitle">
+    <form class="modal-card" id="manualForm" novalidate>
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Takvim</p>
+          <h2 id="manualTitle">Manuel süre ekle</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close-dialog="manualDialog" aria-label="Kapat">
+          <svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg>
+        </button>
+      </div>
+
+      <div class="form-field">
+        <label class="field-label" for="manualDuration">Çalışılan süre</label>
+        <input class="duration-input" type="text" id="manualDuration" name="manualDuration" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="08:00" spellcheck="false" aria-describedby="manualDurationHelper manualError">
+        <p class="field-helper" id="manualDurationHelper">24 saat biçimi (SS:DD). Örnek: 08:30</p>
+      </div>
+
+      <div class="preset-row preset-row-modal" aria-label="Hızlı süre seçenekleri">
+        <span class="preset-label">Hızlı doldur</span>
+        <span class="preset-chips" id="manualDurationChips"></span>
+        <button class="preset-clear" type="button" id="clearDurationsBtn" title="Sık kullanılan süreleri temizle" hidden>Temizle</button>
+      </div>
+
+      <div class="week-picker">
+        <div class="week-picker-head">
+          <span class="field-label">Bu hafta</span>
+          <span class="field-helper" id="manualWeekRange">—</span>
+        </div>
+        <div class="week-day-grid" id="manualWeekDays"></div>
+      </div>
+
+      <div class="form-field">
+        <label class="field-label" for="manualDate">Hangi güne eklensin?</label>
+        <input type="date" id="manualDate" name="manualDate" required>
+        <p class="field-helper" id="manualDateLabel">—</p>
+      </div>
+
+      <p class="field-error" id="manualError" role="alert"></p>
+      <div class="existing-note" id="manualExisting"></div>
+
+      <div class="modal-actions">
+        <span></span>
+        <div class="action-group">
+          <button class="btn btn-ghost" type="button" data-close-dialog="manualDialog">Vazgeç</button>
+          <button class="btn btn-primary" type="submit" id="manualSubmit">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar-plus"/></svg>
             Kaydet
           </button>
         </div>

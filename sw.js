@@ -1,5 +1,5 @@
 /* Horalator Web — offline app shell */
-const CACHE_VERSION = 'horalator-v2';
+const CACHE_VERSION = 'horalator-v15';
 const APP_SHELL = [
   './',
   './index.html',

@@ -7,8 +7,13 @@ Enter a start and end time, and Horalator calculates breaks, net daily hours, we
 ## Features
 
 - Daily gross time, automatic break, net work time, and 8-hour target.
+- Quick-fill presets that learn frequently used start/end pairs for daily entry, plus a separate learned duration list for calendar entry dialogs.
 - Week-by-week calendar with month grouping, current-week highlighting, and totals.
+- Manual duration entry directly on the calendar for any day in the current week or any other date.
+- Click any day in the home page week summary to enter or edit its duration.
+- 24-hour time entry and display (military format) throughout the app, with automatic `:` insertion after two digits and no AM/PM.
 - Add, edit, and delete workdays. Sundays are intentionally excluded.
+- One-tap clearing for daily time fields, single calendar days, whole weeks, and months, with an undo action for deleted records.
 - Calendar stored locally in the browser with `localStorage`.
 - JSON export/import, compatible with the Android app's backup format.
 - Light, dark, and system themes.
